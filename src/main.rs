@@ -6,12 +6,8 @@ use twitter_stream::rt::{self, Future, Stream};
 use yaml_rust::YamlLoader;
 use rustc_serialize::json;
 use chrono::{ParseResult, DateTime, FixedOffset};
+use im::Vector;
 
-/// https://developer.twitter.com/en/docs/tweets/data-dictionary/overview/tweet-object
-struct Tweet {
-    created_at: ParseResult<DateTime<FixedOffset>>,
-    text: String,
-}
 
 #[derive(Debug)]
 struct SentimentCount {
@@ -37,43 +33,66 @@ fn main() {
     backend_handle.join().unwrap();
 }
 
+#[derive(Debug)]
+#[derive(RustcDecodable)]
+struct JSONTweet { created_at: String, text: String, lang: Option<String> }
+
+/// https://developer.twitter.com/en/docs/tweets/data-dictionary/overview/tweet-object
+#[derive(Debug, Clone)]
+struct Tweet {
+    created_at: ParseResult<DateTime<FixedOffset>>,
+    text: String,
+    sentiment: i32,
+}
+
 /// Single threaded, due to sentiment analysis not needing a lot of processing power.
 fn backend(sentiment_count: Arc<Mutex<SentimentCount>>) {
     let tokens = load_twitter_tokens("twitter_tokens.yaml");
     let keywords = "twitter, facebook, google, travel, art, music, photography, love, fashion, food";
 
+    // rrb-tree
+    let mut vec = Vector::new();
+
+    let mut highest = 0.0;
+    let mut lowest = 0.0;
     let future = TwitterStreamBuilder::filter(tokens)
         .track(Some(keywords))
         .listen()
         .unwrap()
         .flatten_stream()
-        .for_each(|json| {
-            let tweet = json_decode(json.to_string());
+        .for_each(move |json| {
+            let tweet: json::DecodeResult<JSONTweet> = json::decode(&json);
+            if let Err(_) = tweet { return Ok(()) }
+            let tweet = tweet.unwrap();
+
+            /// Captures English tweets, because the sentiment analysis library supports English only.
+            if None == tweet.lang || !tweet.lang.unwrap().starts_with("en") { return Ok(()) }
+
+            let datetime = DateTime::parse_from_str(&tweet.created_at, "%a %b %d %H:%M:%S %z %Y");
+            let analysis = sentiment::analyze(tweet.text.clone());
+
+            //// Document what the sentiment range is.
+            if analysis.score > highest {
+                highest = analysis.score;
+                println!("\nNew highest score found!  {}\n{}", highest, tweet.text);
+            }
+            if analysis.score < lowest {
+                lowest = analysis.score;
+                println!("\nNew lowest score found!: {}\n{}", lowest, tweet.text);
+            }
+            ////
+
+            vec.push_back(Tweet {
+                created_at: datetime,
+                text: tweet.text,
+                sentiment: analysis.score as i32,
+            });
+
             Ok(())
         })
         .map_err(|e| eprintln!("error: {}", e));
 
     rt::run(future);
-}
-
-fn json_decode(json: String) -> Option<Tweet> {
-    #[derive(Debug)]
-    #[derive(RustcDecodable)]
-    struct JSONTweet { created_at: String, text: String, lang: Option<String> }
-    let decoded: json::DecodeResult<JSONTweet> = json::decode(&json);
-
-    if let Ok(t) = decoded {
-        if let Some(lang) = &t.lang {
-            if lang.starts_with("en") {
-                return Some(Tweet {
-                    created_at: DateTime::parse_from_str(&t.created_at, "%a %b %d %H:%M:%S %z %Y"),
-                    text: t.text,
-                })
-            }
-        }
-    }
-
-    None
 }
 
 fn load_twitter_tokens(filename: &str) -> Token {
