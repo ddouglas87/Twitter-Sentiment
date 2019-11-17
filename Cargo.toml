@@ -1,5 +1,5 @@
 [package]
-name = "twitter-sentiment"
+name = "twittersentiment"
 version = "0.1.0"
 authors = ["Danielle Douglas <ddouglas87@gmail.com>"]
 edition = "2018"
@@ -11,5 +11,6 @@ yaml-rust = "0.4"
 twitter-stream = "0.9"
 rustc-serialize = "0.3"
 chrono = "0.4"
-im = { version = "13.0", features = ["proptest", "serde"] }
 sentiment = "0.1"
+plotlib = "0.4"
+#im = { version = "13.0", features = ["proptest", "serde"] }
