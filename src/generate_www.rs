@@ -1,50 +1,25 @@
 pub mod generate_www {
     use std::sync::{Arc, Mutex};
 
+    use chrono::Utc;
+    use plotlib::histogram::{Histogram, Style};
     use plotlib::page::Page;
-    use plotlib::scatter;
-    use plotlib::scatter::Scatter;
-    use plotlib::style::{Marker, Point};
+    use plotlib::style::Bar;
     use plotlib::view::ContinuousView;
 
-    use crate::twitter_stream::twitter_stream::SentimentCount;
+    use crate::SentimentData;
 
-    fn make_plot() -> String {
-        // Scatter plots expect a list of pairs
-        let data1 = [
-            (-3.0, 2.3),
-            (-1.6, 5.3),
-            (0.3, 0.7),
-            (4.3, -1.4),
-            (6.4, 4.3),
-            (8.5, 3.7),
-        ];
+    fn make_plot(data: Vec<f64>, bin_size: usize, fill_color: &str) -> String {
+        let h = Histogram::from_slice(data.as_slice(), plotlib::histogram::Bins::Count(bin_size))
+            .style(Style::new().fill(fill_color));
 
-        // We create our scatter plot from the data
-        let s1: Scatter = Scatter::from_slice(&data1).style(
-            scatter::Style::new()
-                .marker(Marker::Square) // setting the marker to be a square
-                .colour("#DD3355"),
-        ); // and a custom colour
-
-        // We can plot multiple data sets in the same view
-        let data2 = [(-1.4, 2.5), (7.2, -0.3)];
-        let s2: Scatter = Scatter::from_slice(&data2).style(
-            scatter::Style::new()
-                .colour("#35C788"),
-        ); // and a different colour
-
-        // The 'view' describes what set of data is drawn
         let v = ContinuousView::new()
-            .add(&s1)
-            .add(&s2)
-            .x_range(-5., 10.)
-            .y_range(-2., 6.)
-            .x_label("Some varying variable")
-            .y_label("The response of something");
+            .add(&h)
+            .x_label("Sentiment Score")
+            .y_label("Number of Tweets");
 
         // A page with a single view is then saved to an SVG file
-        match Page::single(&v).to_svg() {
+        match Page::single(&v).dimensions(800,300).to_svg() {
             Err(e) => {
                 eprintln!("Error generating plot: {}", e);
                 String::new()
@@ -55,8 +30,10 @@ pub mod generate_www {
         }
     }
 
-    pub fn generate_www(sentiment: Arc<Mutex<SentimentCount>>) -> String {
-        let contents_begin = r#"
+    pub fn generate_www(sentiment_data: Arc<Mutex<SentimentData>>) -> String {
+        let start_time = Utc::now().timestamp_millis();
+
+        let html_head = String::from(r#"
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -64,22 +41,49 @@ pub mod generate_www {
 <title>Hello!</title>
 </head>
 <body>
-<h1>Hello!</h1>
-Hi from Rust.  Tweets counted so far:
-"#;
-        let contents_end = r#"
+"#);
+        let html_foot = r#"
 </body>
 </html>
 "#;
 
-        let total;
+        let total_tweets;
+        let mut all_sentiment_data;
+        let mut edge_sentiment_data;  // greater than ±5 sentiment
         {
-            let sc = sentiment.lock().unwrap();
-            total = sc.total.clone();
+            let sd = sentiment_data.lock().unwrap();
+            total_tweets = sd.total_tweets;
+
+            all_sentiment_data = Vec::with_capacity(sd.tweets.len());
+            edge_sentiment_data = Vec::with_capacity(sd.tweets.len());
+            for tweets in &sd.tweets {
+                all_sentiment_data.push(tweets.sentiment);
+
+                if tweets.sentiment > 5.0 || tweets.sentiment < -5.0 {
+                    edge_sentiment_data.push(tweets.sentiment);
+                }
+            }
         }
 
-        let plot = make_plot();
+        let title1 = "<center><h3>Previous Hour of Twitter Sentiment Data</h3></center>";
+        let plot1 = make_plot(all_sentiment_data, 15, "#228b22");
 
-        format!("{}{}\r\n{}{}", contents_begin, total, plot, contents_end)
+        let title2 = "<center><h3>Previous Hour of Twitter Sentiment (Greater than ±5)</h3></center>";
+        let plot2 = make_plot(edge_sentiment_data, 15, "#003366");
+
+        let hello_world = format!("Hi!  I'm written entirely in Rust.  I take Twitter data, do basic sentiment analysis on it, and then plot that data.  I've analyzed {} tweets so far.</ br>", total_tweets);
+
+        let duration = (Utc::now().timestamp_millis() - start_time) as f64 / 1000.0;
+        let rendered_in = format!("<p style=\"text-align:right;\">Page rendered live in: {} seconds.  ^_^</p>", duration);
+
+        html_head +
+            &hello_world +
+            title1 +
+            &plot1 +
+            "<hr>" +
+            title2 +
+            &plot2 +
+            &rendered_in +
+            html_foot
     }
 }

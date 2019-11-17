@@ -1,32 +1,43 @@
 use std::{fs, thread};
+use std::collections::VecDeque;
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 
 use crate::generate_www::generate_www::generate_www;
 use crate::threadpool::threadpool::ThreadPool;
-use crate::twitter_stream::twitter_stream::SentimentCount;
+use crate::twitter_stream::twitter_stream::Tweet;
 use crate::twitter_stream::twitter_stream::twitter_stream;
 
 mod threadpool;
 mod twitter_stream;
 mod generate_www;
 
+#[derive(Debug)]
+pub struct SentimentData {
+    total_tweets: usize,
+    tweets: VecDeque<Tweet>,
+}
+
+const TWEETS_A_SECOND:u8 = 60;
 
 fn main() {
-    let sc = Arc::new(Mutex::new(SentimentCount::new()));
+    let sentiment_data = Arc::new(Mutex::new(SentimentData {
+        total_tweets: 0,
+        tweets: VecDeque::with_capacity(TWEETS_A_SECOND as usize*60*60),
+    }));
 
-    let sc_clone = sc.clone();
+    let sd_clone = sentiment_data.clone();
     let backend_handle = thread::spawn(|| {
-        twitter_stream(sc_clone)
+        twitter_stream(sd_clone)
     });
 
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
-    let pool = ThreadPool::new(2);
+    let pool = ThreadPool::new(num_cpus::get());
 
     for stream in listener.incoming() {
         let mut stream = stream.unwrap();
-        let sc_clone = sc.clone();
+        let sd_clone = sentiment_data.clone();
         pool.execute(move || {
             let mut buffer = [0; 512];
             stream.read(&mut buffer).unwrap();
@@ -35,11 +46,11 @@ fn main() {
 
             let (status_line, contents) = if !buffer.starts_with(b"GET / HTTP/1.1") {
                 let status_line = "HTTP/1.1 404 NOT FOUND";
-                let contents = fs::read_to_string("www/404.htm").unwrap();
+                let contents = fs::read_to_string("www/404.html").unwrap();
                 (status_line, contents)
             } else {
                 let status_line = "HTTP/1.1 200 OK";
-                let contents = generate_www(sc_clone);
+                let contents = generate_www(sd_clone);
                 (status_line, contents)
             };
 

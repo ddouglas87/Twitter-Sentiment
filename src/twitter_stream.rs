@@ -2,46 +2,29 @@ pub mod twitter_stream {
     use std::fs;
     use std::sync::{Arc, Mutex};
 
-    use chrono::{DateTime, FixedOffset, ParseResult};
+    use chrono::{DateTime, Utc};
     use rustc_serialize::json;
     use twitter_stream::{Token, TwitterStreamBuilder};
     use twitter_stream::rt::{self, Future, Stream};
     use yaml_rust::YamlLoader;
 
+    use crate::SentimentData;
 
-    #[derive(Debug)]
-    pub struct SentimentCount {
-        pub total: i32,
-    }
-
-    impl SentimentCount {
-        pub fn new() -> SentimentCount {
-            SentimentCount {
-                total: 0
-            }
-        }
-    }
-
-    #[derive(Debug)]
     #[derive(RustcDecodable)]
     struct JSONTweet { created_at: String, text: String, lang: Option<String> }
 
     /// https://developer.twitter.com/en/docs/tweets/data-dictionary/overview/tweet-object
     #[derive(Debug, Clone)]
-    struct Tweet {
-        created_at: ParseResult<DateTime<FixedOffset>>,
-        text: String,
-        sentiment: i32,
+    pub struct Tweet {
+        pub created_at: i64,
+        pub text: String,
+        pub sentiment: f64,
     }
 
-
     /// Single threaded, due to sentiment analysis not needing a lot of processing power.
-    pub fn twitter_stream(sentiment_count: Arc<Mutex<SentimentCount>>) {
+    pub fn twitter_stream(sentiment_data: Arc<Mutex<SentimentData>>) {
         let tokens = load_twitter_tokens("twitter_tokens.yaml");
         let keywords = "twitter, facebook, google, travel, art, music, photography, love, fashion, food";
-
-        // rrb-tree
-//    let mut vec = Vector::new();
 
         let mut highest = 0.0;
         let mut lowest = 0.0;
@@ -58,10 +41,10 @@ pub mod twitter_stream {
                 // Captures English tweets, because the sentiment analysis library supports English only.
                 if None == tweet.lang || !tweet.lang.unwrap().starts_with("en") { return Ok(()) }
 
-//            let datetime = DateTime::parse_from_str(&tweet.created_at, "%a %b %d %H:%M:%S %z %Y");
+                let datetime = DateTime::parse_from_str(&tweet.created_at, "%a %b %d %H:%M:%S %z %Y").unwrap().timestamp();
                 let analysis = sentiment::analyze(tweet.text.clone());
 
-                //// Document what the sentiment range is.
+                //// Document high scores.
                 if analysis.score > highest {
                     highest = analysis.score;
                     println!("\nNew highest score found!  {}\n{}", highest, tweet.text);
@@ -72,20 +55,26 @@ pub mod twitter_stream {
                 }
                 ////
 
-                match sentiment_count.lock() {
-                    Err(e) => {
-                        eprintln!("Error can not get lock on sentiment count: {}", e);
-                    }
-                    Ok(mut sc) => {
-                        sc.total += 1;
+                let mut sd = sentiment_data.lock().unwrap();
+
+                // Drop tweets older than an hour.
+                while sd.tweets.len() > 1 {
+                    let tweet = sd.tweets.get(0).unwrap();
+                    if Utc::now().timestamp() - tweet.created_at > 60*60 {
+                        sd.tweets.pop_front();
+//                        sd.total_tweets -= 1;
+                    } else {
+                        break;
                     }
                 }
 
-//            vec.push_back(Tweet {
-//                created_at: datetime,
-//                text: tweet.text,
-//                sentiment: analysis.score as i32,
-//            });
+                // Add new tweet
+                sd.total_tweets += 1;
+                sd.tweets.push_back(Tweet {
+                    created_at: datetime,
+                    text: tweet.text,
+                    sentiment: analysis.score as f64,
+                });
 
                 Ok(())
             })
