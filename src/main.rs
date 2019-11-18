@@ -1,4 +1,4 @@
-use std::{fs, thread};
+use std::{fs, thread, env};
 use std::collections::VecDeque;
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -32,7 +32,8 @@ fn main() {
         twitter_stream(sd_clone)
     });
 
-    let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+    let port = env::var("PORT").unwrap_or_else(|_| { String::from("7878") });
+    let listener = TcpListener::bind(String::from("127.0.0.1:") + &port).unwrap();
     let pool = ThreadPool::new(num_cpus::get());
 
     for stream in listener.incoming() {
