@@ -19,12 +19,12 @@ pub struct SentimentData {
     tweets: VecDeque<Tweet>,
 }
 
-const TWEETS_A_SECOND:u8 = 60;
+const TWEETS_A_SECOND:usize = 60;
 
 fn main() {
     let sentiment_data = Arc::new(Mutex::new(SentimentData {
         total_tweets: 0,
-        tweets: VecDeque::with_capacity(TWEETS_A_SECOND as usize*60*60),
+        tweets: VecDeque::with_capacity(TWEETS_A_SECOND*60*5),
     }));
 
     let sd_clone = sentiment_data.clone();

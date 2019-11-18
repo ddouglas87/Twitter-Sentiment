@@ -9,8 +9,8 @@ pub mod generate_www {
 
     use crate::SentimentData;
 
-    fn make_plot(data: Vec<f64>, bin_size: usize, fill_color: &str) -> String {
-        let h = Histogram::from_slice(data.as_slice(), plotlib::histogram::Bins::Count(bin_size))
+    fn make_plot(data: &Vec<f64>, bin_size: usize, fill_color: &str) -> String {
+        let h = Histogram::from_slice(data, plotlib::histogram::Bins::Count(bin_size))
             .style(Style::new().fill(fill_color));
 
         let v = ContinuousView::new()
@@ -65,16 +65,16 @@ pub mod generate_www {
             }
         }
 
-        let title1 = "<center><h3>Previous Hour of Twitter Sentiment Data</h3></center>";
-        let plot1 = make_plot(all_sentiment_data, 15, "#228b22");
+        let title1 = "<center><h3>Previous 5 Minutes of Twitter Sentiment Data</h3></center>";
+        let plot1 = make_plot(&all_sentiment_data, 15, "#228b22");
 
-        let title2 = "<center><h3>Previous Hour of Twitter Sentiment (Greater than ±5)</h3></center>";
-        let plot2 = make_plot(edge_sentiment_data, 15, "#003366");
+        let title2 = "<center><h3>Previous Minutes of Twitter Sentiment (Greater than ±5)</h3></center>";
+        let plot2 = make_plot(&edge_sentiment_data, 15, "#003366");
 
         let hello_world = format!("Hi!  I'm written entirely in Rust.  I take Twitter data, do basic sentiment analysis on it, and then plot that data.  I've analyzed {} tweets so far.</ br>", total_tweets);
 
         let duration = (Utc::now().timestamp_millis() - start_time) as f64 / 1000.0;
-        let rendered_in = format!("<p style=\"text-align:right;\">Page rendered live in: {} seconds.  ^_^</p>", duration);
+        let rendered_in = format!("<p style=\"text-align:right;\">Page rendered live in {} seconds.  ^_^</p>", duration);
 
         html_head +
             &hello_world +

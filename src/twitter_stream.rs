@@ -60,7 +60,7 @@ pub mod twitter_stream {
                 // Drop tweets older than an hour.
                 while sd.tweets.len() > 1 {
                     let tweet = sd.tweets.get(0).unwrap();
-                    if Utc::now().timestamp() - tweet.created_at > 60*60 {
+                    if Utc::now().timestamp() - tweet.created_at > 60*5 {
                         sd.tweets.pop_front();
 //                        sd.total_tweets -= 1;
                     } else {
