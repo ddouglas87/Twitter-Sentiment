@@ -1,3 +1,5 @@
+/// Threadpool ripped from the rust book
+/// https://doc.rust-lang.org/book/ch20-00-final-project-a-web-server.html
 pub mod threadpool {
     use std::sync::{mpsc, Mutex, Arc};
     use std::thread;

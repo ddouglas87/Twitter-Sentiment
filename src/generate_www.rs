@@ -30,6 +30,9 @@ pub mod generate_www {
         }
     }
 
+    /// Makes a web page, with a plot
+    /// Right now it dynamically makes the page every time, due to not being designed to take on a
+    /// heavy load of users.
     pub fn generate_www(sentiment_data: Arc<Mutex<SentimentData>>) -> String {
         let start_time = Utc::now().timestamp_millis();
 
@@ -50,6 +53,7 @@ function load() { setTimeout("window.open(self.location, '_self');", 1500); }
 </html>
 "#;
 
+        // Copies data into a different format for the plotting software.
         let total_tweets;
         let mut all_sentiment_data;
         {
