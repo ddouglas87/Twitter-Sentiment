@@ -1,4 +1,4 @@
-use std::{fs, thread, env};
+use std::{env, fs, thread};
 use std::collections::VecDeque;
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -19,12 +19,13 @@ pub struct SentimentData {
     tweets: VecDeque<Tweet>,
 }
 
-const TWEETS_A_SECOND:usize = 60;
+const TWEETS_A_SECOND:i64 = 60;
+const TWEET_RETAINMENT_SECONDS:i64 = 3*60;
 
 fn main() {
     let sentiment_data = Arc::new(Mutex::new(SentimentData {
         total_tweets: 0,
-        tweets: VecDeque::with_capacity(TWEETS_A_SECOND*60*5),
+        tweets: VecDeque::with_capacity((TWEETS_A_SECOND * TWEET_RETAINMENT_SECONDS) as usize),
     }));
 
     let sd_clone = sentiment_data.clone();

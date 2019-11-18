@@ -8,7 +8,7 @@ pub mod twitter_stream {
     use twitter_stream::rt::{self, Future, Stream};
     use yaml_rust::YamlLoader;
 
-    use crate::SentimentData;
+    use crate::{SentimentData, TWEET_RETAINMENT_SECONDS};
 
     #[derive(RustcDecodable)]
     struct JSONTweet { created_at: String, text: String, lang: Option<String> }
@@ -57,10 +57,10 @@ pub mod twitter_stream {
 
                 let mut sd = sentiment_data.lock().unwrap();
 
-                // Drop tweets older than an hour.
+                // Drop older tweets
                 while sd.tweets.len() > 1 {
                     let tweet = sd.tweets.get(0).unwrap();
-                    if Utc::now().timestamp() - tweet.created_at > 60*5 {
+                    if Utc::now().timestamp() - tweet.created_at > TWEET_RETAINMENT_SECONDS {
                         sd.tweets.pop_front();
 //                        sd.total_tweets -= 1;
                     } else {
