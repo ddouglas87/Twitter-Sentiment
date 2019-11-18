@@ -33,7 +33,7 @@ fn main() {
     });
 
     let port = env::var("PORT").unwrap_or_else(|_| { String::from("7878") });
-    let listener = TcpListener::bind(String::from("127.0.0.1:") + &port).unwrap();
+    let listener = TcpListener::bind(String::from("0.0.0.0:") + &port).unwrap();
     let pool = ThreadPool::new(num_cpus::get());
 
     for stream in listener.incoming() {

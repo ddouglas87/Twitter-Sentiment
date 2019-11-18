@@ -39,8 +39,11 @@ pub mod generate_www {
 <head>
 <meta charset="utf-8">
 <title>Hello!</title>
+<script type="text/javascript">
+function load() { setTimeout("window.open(self.location, '_self');", 1000); }
+</script>
 </head>
-<body>
+<body onload="load()">
 "#);
         let html_foot = r#"
 </body>
@@ -74,7 +77,7 @@ pub mod generate_www {
         let hello_world = format!("Hi!  I'm written entirely in Rust.  I take Twitter data, do basic sentiment analysis on it, and then plot that data.  I've analyzed {} tweets so far.</ br>", total_tweets);
 
         let duration = (Utc::now().timestamp_millis() - start_time) as f64 / 1000.0;
-        let rendered_in = format!("<p style=\"text-align:right;\">Page rendered live in {} seconds.  ^_^</p>", duration);
+        let rendered_in = format!("<p style=\"text-align:right;\">Page rendered live in {:.*} seconds.  ^_^</p>", 3, duration);
 
         html_head +
             &hello_world +
